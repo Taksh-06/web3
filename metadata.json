@@ -1,0 +1,6 @@
+{
+  "name": "Web3 Learning Hub & Block Simulator",
+  "description": "An interactive Web3 educational platform featuring core concept comparisons, a real-time cryptocurrency price feed, and an interactive block mining simulator demonstrating blockchain immutability.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
