@@ -88,14 +88,14 @@ export default function Footer({ setCurrentPage }: FooterProps) {
               </div>
               <div className="pt-1.5">
                 <a
-                  href="https://github.com/takshkathiriya"
+                  href="https://github.com/Taksh-06"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center space-x-2 text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 transition"
                   id="github-profile-link"
                 >
                   <Github className="h-4 w-4" />
-                  <span>github.com/takshkathiriya</span>
+                  <span>Taksh-06</span>
                 </a>
               </div>
             </div>

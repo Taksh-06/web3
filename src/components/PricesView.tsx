@@ -23,6 +23,7 @@ export default function PricesView() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'l1' | 'l2'>('all');
+  const [timeframe, setTimeframe] = useState<'1h' | '1d' | '7d'>('1d');
   const [isSimulatedFeed, setIsSimulatedFeed] = useState<boolean>(false);
   const [refreshCountdown, setRefreshCountdown] = useState<number>(0);
 
@@ -49,7 +50,7 @@ export default function PricesView() {
     setErrorMsg(null);
     try {
       const symbols = coinMetadata.map(c => `"${c.symbol}USDT"`).join(',');
-      const url = `https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols}]`;
+      const url = `https://api.binance.com/api/v3/ticker?symbols=[${symbols}]&windowSize=${timeframe}`;
       
       const response = await fetch(url);
       if (!response.ok) {
@@ -119,7 +120,7 @@ export default function PricesView() {
 
   useEffect(() => {
     fetchPricesFromAPI();
-  }, []);
+  }, [timeframe]);
 
   const handleManualRefresh = () => {
     fetchPricesFromAPI();
@@ -220,7 +221,7 @@ export default function PricesView() {
       {/* Filter and Search Bar Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 bg-white dark:bg-[#0d0d0d] p-4 rounded-xl border border-stone-200 dark:border-stone-800 transition-colors duration-300" id="market-filters-row">
         {/* Search */}
-        <div className="relative sm:col-span-6">
+        <div className="relative sm:col-span-12 lg:col-span-5">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
           <input
             type="text"
@@ -233,7 +234,7 @@ export default function PricesView() {
         </div>
 
         {/* Categories */}
-        <div className="flex gap-1 bg-stone-100 dark:bg-stone-900/40 p-1 rounded-lg border border-stone-200 dark:border-stone-800 sm:col-span-6 justify-between sm:justify-start transition-colors duration-300">
+        <div className="flex gap-1 bg-stone-100 dark:bg-stone-900/40 p-1 rounded-lg border border-stone-200 dark:border-stone-800 sm:col-span-6 lg:col-span-4 justify-between sm:justify-start transition-colors duration-300">
           <button
             onClick={() => setCategoryFilter('all')}
             className={`flex-1 sm:flex-none rounded-md px-4 py-1.5 text-xs font-semibold transition cursor-pointer ${
@@ -263,6 +264,40 @@ export default function PricesView() {
             }`}
           >
             Layer 2
+          </button>
+        </div>
+
+        {/* Timeframes */}
+        <div className="flex gap-1 bg-stone-100 dark:bg-stone-900/40 p-1 rounded-lg border border-stone-200 dark:border-stone-800 sm:col-span-6 lg:col-span-3 justify-between sm:justify-start transition-colors duration-300">
+          <button
+            onClick={() => setTimeframe('1h')}
+            className={`flex-1 sm:flex-none rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              timeframe === '1h'
+                ? 'bg-white dark:bg-stone-900 text-teal-600 dark:text-teal-400 border border-stone-200 dark:border-stone-800 shadow-sm'
+                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
+            }`}
+          >
+            1H
+          </button>
+          <button
+            onClick={() => setTimeframe('1d')}
+            className={`flex-1 sm:flex-none rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              timeframe === '1d'
+                ? 'bg-white dark:bg-stone-900 text-teal-600 dark:text-teal-400 border border-stone-200 dark:border-stone-800 shadow-sm'
+                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
+            }`}
+          >
+            24H
+          </button>
+          <button
+            onClick={() => setTimeframe('7d')}
+            className={`flex-1 sm:flex-none rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              timeframe === '7d'
+                ? 'bg-white dark:bg-stone-900 text-teal-600 dark:text-teal-400 border border-stone-200 dark:border-stone-800 shadow-sm'
+                : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
+            }`}
+          >
+            7D
           </button>
         </div>
       </div>
@@ -343,7 +378,9 @@ export default function PricesView() {
                         {coin.change24h.toFixed(2)}%
                       </span>
                     </span>
-                    <span className="text-[10px] text-stone-500">past 24h</span>
+                    <span className="text-[10px] text-stone-500">
+                      past {timeframe === '1h' ? '1h' : timeframe === '1d' ? '24h' : '7d'}
+                    </span>
                   </div>
                 </div>
 
@@ -351,7 +388,9 @@ export default function PricesView() {
                 <div className="flex items-center justify-between pt-4 border-t border-stone-200 dark:border-stone-800/60 mt-auto font-sans">
                   {/* Custom render sparkline based on historical fluctuations */}
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-mono text-stone-500 uppercase">24h Trend</span>
+                    <span className="text-[9px] font-mono text-stone-500 uppercase">
+                      {timeframe === '1h' ? '1h' : timeframe === '1d' ? '24h' : '7d'} Trend
+                    </span>
                     <div className="mt-1">
                       {renderSparkline(coin.sparkline, isPositive)}
                     </div>
