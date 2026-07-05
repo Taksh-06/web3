@@ -4,15 +4,10 @@ import {
   TrendingUp, 
   TrendingDown, 
   RefreshCw, 
-  Search, 
-  Coins, 
-  Layers, 
-  Info,
+  Search,
   CheckCircle,
   AlertCircle,
-  X,
-  CalendarDays,
-  BarChart2
+  X
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
@@ -24,7 +19,6 @@ export default function PricesView() {
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'l1' | 'l2'>('all');
   const [timeframe, setTimeframe] = useState<'1h' | '1d' | '7d'>('1d');
   const [isSimulatedFeed, setIsSimulatedFeed] = useState<boolean>(false);
-  const [refreshCountdown, setRefreshCountdown] = useState<number>(0);
 
   // Modal & Chart state
   const [selectedCoin, setSelectedCoin] = useState<CoinPrice | null>(null);
