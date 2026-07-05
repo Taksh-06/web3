@@ -55,10 +55,19 @@ export default function PricesView() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const symbols = coinMetadata.map(c => `"${c.symbol}USDT"`).join(',');
-      const url = `https://api.binance.com/api/v3/ticker?symbols=[${symbols}]&windowSize=${timeframe}`;
+      const ids = coinMetadata.map(c => c.id).join(',');
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
       
-      const response = await fetch(url);
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      };
+      
+      const apiKey = import.meta.env.VITE_COINGECKO_API_KEY;
+      if (apiKey) {
+        headers['x-cg-demo-api-key'] = apiKey;
+      }
+
+      const response = await fetch(url, { headers });
       if (!response.ok) {
         throw new Error(`API response error: status ${response.status}`);
       }
@@ -66,9 +75,9 @@ export default function PricesView() {
       const data = await response.json();
       
       const updatedPrices: CoinPrice[] = coinMetadata.map(coin => {
-        const coinData = data.find((d: any) => d.symbol === `${coin.symbol}USDT`);
-        const newPrice = coinData ? parseFloat(coinData.lastPrice) : coin.initialPrice;
-        const newChange = coinData ? parseFloat(coinData.priceChangePercent) : coin.baseChange;
+        const coinData = data[coin.id];
+        const newPrice = coinData?.usd ?? coin.initialPrice;
+        const newChange = coinData?.usd_24h_change ?? coin.baseChange;
         
         // Generate new sparkline point based on the fetched price
         const previousSpark = defaultSparklines[coin.id] || [newPrice];
@@ -89,8 +98,8 @@ export default function PricesView() {
       setPrices(updatedPrices);
       setIsSimulatedFeed(false);
     } catch (err) {
-      console.warn("Binance API rate-limited or failed, loading backup simulated feed.", err);
-      setErrorMsg("Binance API rate-limited (HTTP 429). Activating responsive simulated feed.");
+      console.warn("CoinGecko API rate-limited or failed, loading backup simulated feed.", err);
+      setErrorMsg("CoinGecko API rate-limited. Activating responsive simulated feed.");
       loadBackupSimulatedFeed();
     } finally {
       setLoading(false);
@@ -173,21 +182,31 @@ export default function PricesView() {
     setChartLoading(true);
     setChartError(null);
     try {
-      let interval = '15m';
-      let limit = 96;
+      let days = '1';
       
       switch (timeframe) {
-        case '1D': interval = '15m'; limit = 96; break;
-        case '5D': interval = '2h'; limit = 60; break;
-        case '1M': interval = '1d'; limit = 30; break;
-        case '6M': interval = '1d'; limit = 180; break;
-        case 'YTD': interval = '1d'; limit = 200; break; 
-        case '1Y': interval = '1d'; limit = 365; break;
-        case '5Y': interval = '1w'; limit = 260; break;
-        case 'Max': interval = '1M'; limit = 1000; break;
+        case '1D': days = '1'; break;
+        case '5D': days = '5'; break;
+        case '1M': days = '30'; break;
+        case '6M': days = '180'; break;
+        case 'YTD': days = '200'; break; 
+        case '1Y': days = '365'; break;
+        case '5Y': days = '1825'; break;
+        case 'Max': days = 'max'; break;
       }
 
-      const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${coin.symbol}USDT&interval=${interval}&limit=${limit}`);
+      const url = `https://api.coingecko.com/api/v3/coins/${coin.id}/market_chart?vs_currency=usd&days=${days}`;
+      
+      const headers: Record<string, string> = {
+        'Accept': 'application/json'
+      };
+      
+      const apiKey = import.meta.env.VITE_COINGECKO_API_KEY;
+      if (apiKey) {
+        headers['x-cg-demo-api-key'] = apiKey;
+      }
+
+      const response = await fetch(url, { headers });
       
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -195,7 +214,7 @@ export default function PricesView() {
 
       const data = await response.json();
       
-      const formattedData = data.map((d: any) => {
+      const formattedData = data.prices.map((d: any) => {
         const date = new Date(d[0]);
         let timeLabel = '';
         if (timeframe === '1D') {
@@ -207,14 +226,14 @@ export default function PricesView() {
         }
         return {
           time: timeLabel,
-          price: parseFloat(d[4]) // Close price
+          price: parseFloat(d[1]) // Close price
         };
       });
 
       setChartData(formattedData);
     } catch (err) {
-      console.warn("Failed to fetch historical data from Binance", err);
-      setChartError("Binance API Rate Limited. Displaying simulated trend data.");
+      console.warn("Failed to fetch historical data from CoinGecko", err);
+      setChartError("CoinGecko API Rate Limited. Displaying simulated trend data.");
       generateSimulatedChartData(coin, timeframe);
     } finally {
       setChartLoading(false);
@@ -637,21 +656,6 @@ export default function PricesView() {
               )}
             </div>
 
-            {/* Converter Footer */}
-            <div className="p-6 pt-4 bg-[#202124] border-t border-[#3c4043] flex gap-4">
-              <div className="flex-1 flex items-center border border-[#5f6368] rounded-md overflow-hidden bg-[#202124] h-14 focus-within:border-[#8ab4f8]">
-                <input type="text" readOnly value="1" className="bg-transparent border-none outline-none text-white px-4 py-2 w-full font-sans text-lg" />
-                <div className="px-4 text-[#9aa0a6] border-l border-[#5f6368] h-full flex items-center bg-[#303134] font-medium min-w-[80px] justify-center">
-                  {selectedCoin.symbol}
-                </div>
-              </div>
-              <div className="flex-1 flex items-center border border-[#5f6368] rounded-md overflow-hidden bg-[#202124] h-14 focus-within:border-[#8ab4f8]">
-                <input type="text" readOnly value={selectedCoin.priceUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})} className="bg-transparent border-none outline-none text-white px-4 py-2 w-full font-sans text-lg" />
-                <div className="px-4 text-[#9aa0a6] border-l border-[#5f6368] h-full flex items-center bg-[#303134] font-medium min-w-[80px] justify-center">
-                  USD
-                </div>
-              </div>
-            </div>
 
           </div>
         </div>
