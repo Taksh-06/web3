@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from 'react';
 import { CoinPrice } from '../types';
 import { 
@@ -14,8 +9,12 @@ import {
   Layers, 
   Info,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  X,
+  CalendarDays,
+  BarChart2
 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function PricesView() {
   const [prices, setPrices] = useState<CoinPrice[]>([]);
@@ -26,6 +25,13 @@ export default function PricesView() {
   const [timeframe, setTimeframe] = useState<'1h' | '1d' | '7d'>('1d');
   const [isSimulatedFeed, setIsSimulatedFeed] = useState<boolean>(false);
   const [refreshCountdown, setRefreshCountdown] = useState<number>(0);
+
+  // Modal & Chart state
+  const [selectedCoin, setSelectedCoin] = useState<CoinPrice | null>(null);
+  const [chartTimeframe, setChartTimeframe] = useState<'1D' | '5D' | '1M' | '6M' | 'YTD' | '1Y' | '5Y' | 'Max'>('1D');
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartLoading, setChartLoading] = useState<boolean>(false);
+  const [chartError, setChartError] = useState<string | null>(null);
 
   // Initial seed sparklines for visual flair
   const defaultSparklines: Record<string, number[]> = {
@@ -118,9 +124,123 @@ export default function PricesView() {
     setPrices(simulated);
   };
 
+  const generateSimulatedChartData = (coin: CoinPrice, timeframe: string) => {
+    let points = 24;
+    let timeStep = 3600 * 1000;
+    
+    switch (timeframe) {
+      case '1D': points = 96; timeStep = 15 * 60 * 1000; break;
+      case '5D': points = 60; timeStep = 2 * 3600 * 1000; break;
+      case '1M': points = 30; timeStep = 24 * 3600 * 1000; break;
+      case '6M': points = 180; timeStep = 24 * 3600 * 1000; break;
+      case 'YTD': points = 200; timeStep = 24 * 3600 * 1000; break;
+      case '1Y': points = 365; timeStep = 24 * 3600 * 1000; break;
+      case '5Y': points = 260; timeStep = 7 * 24 * 3600 * 1000; break;
+      case 'Max': points = 300; timeStep = 30 * 24 * 3600 * 1000; break;
+    }
+
+    const data = [];
+    let currentPrice = coin.priceUsd * (1 - (coin.change24h / 100)); // approximate start price
+    const now = new Date().getTime();
+
+    for (let i = points; i >= 0; i--) {
+      const date = new Date(now - i * timeStep);
+      let timeLabel = '';
+      if (timeframe === '1D') {
+        timeLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else if (timeframe === '5D' || timeframe === '1M') {
+        timeLabel = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      } else {
+        timeLabel = date.toLocaleDateString([], { month: 'short', year: '2-digit' });
+      }
+
+      data.push({
+        time: timeLabel,
+        price: currentPrice
+      });
+
+      // generate next random walk
+      currentPrice = currentPrice * (1 + (Math.random() * 0.02 - 0.01));
+    }
+    
+    // Ensure the last point is current price
+    data[data.length - 1].price = coin.priceUsd;
+    
+    setChartData(data);
+  };
+
+  const fetchHistoricalData = async (coin: CoinPrice, timeframe: string) => {
+    setChartLoading(true);
+    setChartError(null);
+    try {
+      let interval = '15m';
+      let limit = 96;
+      
+      switch (timeframe) {
+        case '1D': interval = '15m'; limit = 96; break;
+        case '5D': interval = '2h'; limit = 60; break;
+        case '1M': interval = '1d'; limit = 30; break;
+        case '6M': interval = '1d'; limit = 180; break;
+        case 'YTD': interval = '1d'; limit = 200; break; 
+        case '1Y': interval = '1d'; limit = 365; break;
+        case '5Y': interval = '1w'; limit = 260; break;
+        case 'Max': interval = '1M'; limit = 1000; break;
+      }
+
+      const response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${coin.symbol}USDT&interval=${interval}&limit=${limit}`);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      const formattedData = data.map((d: any) => {
+        const date = new Date(d[0]);
+        let timeLabel = '';
+        if (timeframe === '1D') {
+          timeLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } else if (timeframe === '5D' || timeframe === '1M') {
+          timeLabel = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        } else {
+          timeLabel = date.toLocaleDateString([], { month: 'short', year: '2-digit' });
+        }
+        return {
+          time: timeLabel,
+          price: parseFloat(d[4]) // Close price
+        };
+      });
+
+      setChartData(formattedData);
+    } catch (err) {
+      console.warn("Failed to fetch historical data from Binance", err);
+      setChartError("Binance API Rate Limited. Displaying simulated trend data.");
+      generateSimulatedChartData(coin, timeframe);
+    } finally {
+      setChartLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchPricesFromAPI();
   }, [timeframe]);
+
+  useEffect(() => {
+    if (selectedCoin) {
+      fetchHistoricalData(selectedCoin, chartTimeframe);
+    }
+  }, [selectedCoin, chartTimeframe]);
+
+  useEffect(() => {
+    if (selectedCoin) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedCoin]);
 
   const handleManualRefresh = () => {
     fetchPricesFromAPI();
@@ -140,7 +260,6 @@ export default function PricesView() {
 
   const filteredCoins = getFilteredCoins();
 
-  // Helper to draw a SVG sparkline path
   const renderSparkline = (points: number[], isPositive: boolean) => {
     if (!points || points.length === 0) return null;
     const min = Math.min(...points);
@@ -185,7 +304,6 @@ export default function PricesView() {
           </p>
         </div>
 
-        {/* Action Controls */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleManualRefresh}
@@ -201,7 +319,6 @@ export default function PricesView() {
         </div>
       </div>
 
-      {/* API Feed Status Indicator */}
       {isSimulatedFeed ? (
         <div className="rounded-xl border border-amber-200 dark:border-amber-950 bg-amber-50 dark:bg-amber-950/10 p-4 text-xs flex gap-3 items-center text-amber-700 dark:text-amber-300 font-sans transition-colors duration-300">
           <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 dark:text-amber-400" />
@@ -218,9 +335,7 @@ export default function PricesView() {
         </div>
       )}
 
-      {/* Filter and Search Bar Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 bg-white dark:bg-[#0d0d0d] p-4 rounded-xl border border-stone-200 dark:border-stone-800 transition-colors duration-300" id="market-filters-row">
-        {/* Search */}
         <div className="relative sm:col-span-12 lg:col-span-5">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" />
           <input
@@ -233,7 +348,6 @@ export default function PricesView() {
           />
         </div>
 
-        {/* Categories */}
         <div className="flex gap-1 bg-stone-100 dark:bg-stone-900/40 p-1 rounded-lg border border-stone-200 dark:border-stone-800 sm:col-span-6 lg:col-span-4 justify-between sm:justify-start transition-colors duration-300">
           <button
             onClick={() => setCategoryFilter('all')}
@@ -267,7 +381,6 @@ export default function PricesView() {
           </button>
         </div>
 
-        {/* Timeframes */}
         <div className="flex gap-1 bg-stone-100 dark:bg-stone-900/40 p-1 rounded-lg border border-stone-200 dark:border-stone-800 sm:col-span-6 lg:col-span-3 justify-between sm:justify-start transition-colors duration-300">
           <button
             onClick={() => setTimeframe('1h')}
@@ -302,7 +415,6 @@ export default function PricesView() {
         </div>
       </div>
 
-      {/* Coin Grid */}
       {loading && prices.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 space-y-4">
           <RefreshCw className="h-8 w-8 text-teal-400 animate-spin" />
@@ -322,10 +434,10 @@ export default function PricesView() {
             return (
               <div
                 key={coin.id}
-                className="flex flex-col justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#0d0d0d] p-6 transition-all hover:-translate-y-1 hover:border-teal-500/30 dark:hover:border-teal-500/20 duration-200"
+                onClick={() => setSelectedCoin(coin)}
+                className="flex flex-col justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#0d0d0d] p-6 transition-all hover:-translate-y-1 hover:border-teal-500/30 dark:hover:border-teal-500/20 duration-200 cursor-pointer shadow-sm hover:shadow-md dark:shadow-none"
                 id={`coin-card-${coin.symbol}`}
               >
-                {/* Symbol, Name & Type Badge */}
                 <div className="flex items-center justify-between pb-4 border-b border-stone-200 dark:border-stone-800/60">
                   <div className="flex items-center space-x-3">
                     <div className={`flex h-10 w-10 items-center justify-center rounded-lg font-bold font-mono text-sm ${
@@ -352,7 +464,6 @@ export default function PricesView() {
                   </span>
                 </div>
 
-                {/* Price Display */}
                 <div className="py-5 font-sans">
                   <div className="flex items-baseline space-x-2">
                     <span className="font-serif text-2xl font-bold tracking-tight text-stone-900 dark:text-white">
@@ -363,7 +474,6 @@ export default function PricesView() {
                     </span>
                   </div>
 
-                  {/* 24h Change Badge */}
                   <div className="flex items-center space-x-2 mt-2">
                     <span className={`inline-flex items-center space-x-1 rounded px-1.5 py-0.5 text-xs font-semibold ${
                       isPositive ? 'bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400' : 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400'
@@ -384,9 +494,7 @@ export default function PricesView() {
                   </div>
                 </div>
 
-                {/* Sparkline & Metadata footer */}
                 <div className="flex items-center justify-between pt-4 border-t border-stone-200 dark:border-stone-800/60 mt-auto font-sans">
-                  {/* Custom render sparkline based on historical fluctuations */}
                   <div className="flex flex-col">
                     <span className="text-[9px] font-mono text-stone-500 uppercase">
                       {timeframe === '1h' ? '1h' : timeframe === '1d' ? '24h' : '7d'} Trend
@@ -404,6 +512,148 @@ export default function PricesView() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Google Finance Style Chart Modal */}
+      {selectedCoin && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 transition-opacity">
+          <div className="bg-[#202124] rounded-xl border border-[#3c4043] w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col text-stone-200 font-sans relative">
+            
+            <button 
+              onClick={() => setSelectedCoin(null)}
+              className="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-white hover:bg-stone-700 transition-colors z-10 cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="p-6 pb-2">
+              <div className="text-[#9aa0a6] text-sm mb-2 flex items-center gap-1">
+                <span>Market Summary</span>
+                <span>&gt;</span>
+                <span className="text-stone-200">{selectedCoin.name}</span>
+              </div>
+              
+              <div className="flex items-end gap-2">
+                <h1 className="text-5xl font-normal tracking-tight text-white">
+                  {selectedCoin.priceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                </h1>
+                <span className="text-2xl text-[#9aa0a6] font-normal mb-1">USD</span>
+              </div>
+              
+              <div className={`mt-2 flex items-center gap-1 text-lg font-medium ${selectedCoin.change24h >= 0 ? 'text-[#81c995]' : 'text-[#f28b82]'}`}>
+                <span>{selectedCoin.change24h >= 0 ? '+' : ''}{(selectedCoin.priceUsd * Math.abs(selectedCoin.change24h) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
+                <span>({selectedCoin.change24h >= 0 ? '+' : ''}{selectedCoin.change24h.toFixed(2)}%)</span>
+                {selectedCoin.change24h >= 0 ? <TrendingUp className="h-5 w-5 ml-1" /> : <TrendingDown className="h-5 w-5 ml-1" />}
+                <span className="text-[#9aa0a6] text-sm ml-1 font-normal">today</span>
+              </div>
+
+              <div className="text-[#9aa0a6] text-xs mt-2 flex items-center gap-2">
+                <span>{selectedCoin.lastUpdated} · <span className="underline cursor-pointer">Disclaimer</span></span>
+              </div>
+            </div>
+
+            {/* Timeframe Tabs */}
+            <div className="flex px-6 mt-4 border-b border-[#3c4043] gap-6 text-sm font-medium">
+              {['1D', '5D', '1M', '6M', 'YTD', '1Y', '5Y', 'Max'].map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setChartTimeframe(tf as any)}
+                  className={`pb-3 border-b-2 transition-colors cursor-pointer ${
+                    chartTimeframe === tf 
+                      ? 'border-[#8ab4f8] text-[#8ab4f8]' 
+                      : 'border-transparent text-[#9aa0a6] hover:text-stone-300'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart Area */}
+            <div className="p-0 relative h-[350px] w-full mt-4">
+              {chartError && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 rounded bg-[#3c4043] px-3 py-1.5 text-xs text-amber-300 flex items-center gap-2 shadow-lg">
+                  <AlertCircle className="h-3 w-3" />
+                  {chartError}
+                </div>
+              )}
+
+              {chartLoading ? (
+                <div className="h-full w-full flex flex-col items-center justify-center space-y-3">
+                  <RefreshCw className="h-8 w-8 text-[#8ab4f8] animate-spin" />
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={selectedCoin.change24h >= 0 ? '#81c995' : '#f28b82'} stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor={selectedCoin.change24h >= 0 ? '#81c995' : '#f28b82'} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#3c4043" opacity={0.5} />
+                    <XAxis 
+                      dataKey="time" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#9aa0a6' }}
+                      dy={10}
+                      minTickGap={40}
+                    />
+                    <YAxis 
+                      domain={['auto', 'auto']}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#9aa0a6' }}
+                      tickFormatter={(value) => value >= 1000 ? (value/1000).toFixed(1) + 'k' : value.toFixed(2)}
+                      orientation="left"
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#202124', 
+                        border: '1px solid #3c4043',
+                        borderRadius: '4px',
+                        color: '#e8eaed',
+                        fontSize: '12px',
+                        padding: '8px 12px',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                      }}
+                      itemStyle={{ color: '#e8eaed', fontWeight: 500 }}
+                      formatter={(value: number) => [value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6}), '']}
+                      labelStyle={{ color: '#9aa0a6', marginBottom: '2px', fontSize: '11px' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="price" 
+                      stroke={selectedCoin.change24h >= 0 ? '#81c995' : '#f28b82'} 
+                      strokeWidth={1.5}
+                      fillOpacity={1} 
+                      fill="url(#colorPrice)" 
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Converter Footer */}
+            <div className="p-6 pt-4 bg-[#202124] border-t border-[#3c4043] flex gap-4">
+              <div className="flex-1 flex items-center border border-[#5f6368] rounded-md overflow-hidden bg-[#202124] h-14 focus-within:border-[#8ab4f8]">
+                <input type="text" readOnly value="1" className="bg-transparent border-none outline-none text-white px-4 py-2 w-full font-sans text-lg" />
+                <div className="px-4 text-[#9aa0a6] border-l border-[#5f6368] h-full flex items-center bg-[#303134] font-medium min-w-[80px] justify-center">
+                  {selectedCoin.symbol}
+                </div>
+              </div>
+              <div className="flex-1 flex items-center border border-[#5f6368] rounded-md overflow-hidden bg-[#202124] h-14 focus-within:border-[#8ab4f8]">
+                <input type="text" readOnly value={selectedCoin.priceUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})} className="bg-transparent border-none outline-none text-white px-4 py-2 w-full font-sans text-lg" />
+                <div className="px-4 text-[#9aa0a6] border-l border-[#5f6368] h-full flex items-center bg-[#303134] font-medium min-w-[80px] justify-center">
+                  USD
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
     </div>
