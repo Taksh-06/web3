@@ -37,6 +37,11 @@ export default function PricesView() {
   const defaultSparklines: Record<string, number[]> = {
     bitcoin: [63800, 63950, 64100, 64000, 63900, 64200, 64350, 64250, 64400, 64250],
     ethereum: [3410, 3425, 3440, 3420, 3415, 3438, 3460, 3452, 3470, 3450],
+    binancecoin: [580, 585, 590, 582, 578, 588, 595, 592, 598, 595],
+    ripple: [0.55, 0.56, 0.54, 0.55, 0.57, 0.56, 0.58, 0.57, 0.59, 0.58],
+    dogecoin: [0.12, 0.13, 0.125, 0.122, 0.128, 0.135, 0.132, 0.138, 0.136, 0.14],
+    cardano: [0.42, 0.43, 0.41, 0.42, 0.44, 0.43, 0.45, 0.44, 0.46, 0.45],
+    'avalanche-2': [25.5, 26.2, 25.8, 26.5, 27.1, 26.8, 27.5, 27.2, 27.8, 27.5],
     arbitrum: [0.94, 0.95, 0.97, 0.96, 0.955, 0.98, 0.99, 0.982, 0.995, 0.9823],
     solana: [142.1, 143.5, 144.8, 144.2, 143.9, 145.1, 146.4, 145.8, 146.9, 145.6],
     'matic-network': [0.565, 0.572, 0.581, 0.578, 0.574, 0.583, 0.589, 0.585, 0.591, 0.582]
@@ -46,8 +51,13 @@ export default function PricesView() {
   const coinMetadata = [
     { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'l1', initialPrice: 64250.25, baseChange: 2.14 },
     { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', type: 'l1', initialPrice: 3450.40, baseChange: -1.25 },
-    { id: 'arbitrum', name: 'Arbitrum', symbol: 'ARB', type: 'l2', initialPrice: 0.9823, baseChange: 5.72 },
+    { id: 'binancecoin', name: 'BNB', symbol: 'BNB', type: 'l1', initialPrice: 595.00, baseChange: 0.85 },
     { id: 'solana', name: 'Solana', symbol: 'SOL', type: 'l1', initialPrice: 145.60, baseChange: -0.85 },
+    { id: 'ripple', name: 'XRP', symbol: 'XRP', type: 'l1', initialPrice: 0.58, baseChange: 1.20 },
+    { id: 'dogecoin', name: 'Dogecoin', symbol: 'DOGE', type: 'l1', initialPrice: 0.14, baseChange: 5.40 },
+    { id: 'cardano', name: 'Cardano', symbol: 'ADA', type: 'l1', initialPrice: 0.45, baseChange: 2.10 },
+    { id: 'avalanche-2', name: 'Avalanche', symbol: 'AVAX', type: 'l1', initialPrice: 27.50, baseChange: -1.50 },
+    { id: 'arbitrum', name: 'Arbitrum', symbol: 'ARB', type: 'l2', initialPrice: 0.9823, baseChange: 5.72 },
     { id: 'matic-network', name: 'Polygon', symbol: 'POL', type: 'l2', initialPrice: 0.5820, baseChange: 1.15 }
   ];
 
