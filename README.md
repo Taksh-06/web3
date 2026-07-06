@@ -1,5 +1,7 @@
 # NEXUS L2: Web3 Learning Hub & Block Simulator
 
+**Live Demo:** [https://web3-block-chain.netlify.app/](https://web3-block-chain.netlify.app/)
+
 Nexus L2 is a highly polished, interactive educational platform designed to introduce foundational Web3 concepts, demonstrate Layer 2 scaling mechanics, and make block-mining cryptographic systems tangible.
 
 Built with React, Vite, Tailwind CSS, and Framer Motion, the application is structured as a modular single-page application (SPA) with smooth, state-based view transitions.
